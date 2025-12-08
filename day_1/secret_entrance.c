@@ -33,19 +33,7 @@ int main() {
 
         dialPos += atoi(turn_amt) * direction;
 
-        if (dialPos < 0) {
-            while (dialPos < 0) {
-                dialPos = dialPos + 100;
-            }
-        } else if (dialPos >= 100) {
-            while (dialPos >100) {
-                dialPos = dialPos - 100;
-            }
-
-            if (dialPos == 100) {
-                dialPos = 0;
-            }
-        }
+        dialPos = dialPos % 100;
 
         if (dialPos == 0) {
             password++;
