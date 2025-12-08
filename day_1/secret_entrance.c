@@ -71,12 +71,6 @@ int main() {
             dialPos = 100 + dialPos;
         }
 
-        // if (dialPos == 0) {
-        //     password++;
-        //     pw_change++;
-        //     triggered_pass = true;
-        // }
-
         printf("Line %4d: %3d %5s %d\n", lineNum, dialPos, triggered_pass ? "true" : "false", pw_change);
         lineNum++;
     }
