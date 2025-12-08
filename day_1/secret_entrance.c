@@ -31,12 +31,13 @@ int main() {
             turn_amt[i] = '\0';
         }
 
-        dialPos += atoi(turn_amt) * direction;
+        for (int i = 0; i < atoi(turn_amt); i++) {
+            dialPos = dialPos + (direction);
+            dialPos = dialPos % 100;
 
-        dialPos = dialPos % 100;
-
-        if (dialPos == 0) {
-            password++;
+            if (dialPos == 0) {
+                password++;
+            }
         }
 
         printf("Line %4d: %5d\n", lineNum, dialPos);
