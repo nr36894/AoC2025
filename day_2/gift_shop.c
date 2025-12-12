@@ -3,32 +3,21 @@
 #include <string.h>
 #include <stdbool.h>
 
-void splitString(const char *original, char **first_half, char **second_half) {
-    int length = strlen(original);
-    int mid_point = length/2;
-
-    *first_half = (char *)malloc((mid_point + 1) * sizeof(char));
-    if (*first_half == NULL) {
-        perror("Failed to allocate memory for first half");
-        exit(EXIT_FAILURE);
+int countSubstring(const char *str, const char *sub) {
+    int count = 0;
+    const char *tmp = str;
+    while ((tmp = strstr(tmp, sub)) != NULL) {
+        count ++;
+        tmp += strlen(sub);
     }
-    strncpy(*first_half, original, mid_point);
-    (*first_half)[mid_point] = '\0';
-
-    *second_half = (char *)malloc(((length - mid_point) + 1) * sizeof(char));
-    if (*second_half == NULL) {
-        perror("Failed to allocate memory for second half");
-        free(*first_half);
-        exit(EXIT_FAILURE);
-    }
-
-    strncpy(*second_half, original + mid_point, length - mid_point);
-    (*second_half)[length - mid_point] = '\0';
+    return count;
 }
 
 int main() {
     FILE *fp;
     char line[512];
+    char substring[256];
+    int sub_idx = 0;
     char *tokens[1024];
     int num_tokens = 0;
     char *token;
@@ -53,13 +42,10 @@ int main() {
 
     token = strtok(line, ",");
     while (token != NULL) {
-        printf("TOKEN: %s\n", token);
         tokens[num_tokens] = token;
         num_tokens++;
         token = strtok(NULL, ",");
     }
-
-    printf("\n\n");
 
     for (int i = 0; i < num_tokens; i++) {
         num_invalid_ids = 0;
@@ -74,15 +60,42 @@ int main() {
         for(u_int64_t j = first; j <= last; j++) {
             sprintf(str_num, "%llu", j);
             //printf("NUM: %s\n", str_num);
-            if (strlen(str_num)%2 != 0) {
-                continue;
-            } else {
-                splitString(str_num, &str_first, &str_end);
 
-                if (atoi(str_first) == atoi(str_end)) {
+            int length = strlen(str_num);
+            int mid_point = (length) / 2;
+
+            for (int index = 0; index < mid_point; index++) {
+                int end = index;
+                int start = 0;
+                sub_idx = 0;
+
+                for (; start <= end; start++) {
+                    substring[sub_idx] = str_num[start];
+                    sub_idx++;
+                }
+
+                substring[sub_idx] = '\0';
+                //printf("SUBSTRING: %s\n", substring);
+
+                int times_repeated = countSubstring(str_num, substring);
+                int required_repeat = strlen(str_num) / strlen(substring);
+                int remaining_length = strlen(str_num) % strlen(substring);
+
+                if (remaining_length > 0) {
+                    //printf("%llu Cannot be invalid\n\n", j);
+                    continue;
+                }
+
+                //printf("Times Repated: %d, Required Repeat: %d\n", times_repeated, required_repeat);
+
+                if (times_repeated == required_repeat) {
+                    printf("INVALID ID FOUND: %llu\n", j);
                     invalid_ids[num_invalid_ids] = j;
                     num_invalid_ids++;
+                    break;
                 }
+                //printf("\n");
+
             }
         }
 
@@ -91,11 +104,11 @@ int main() {
         } else {
             for (u_int64_t i = 0; i < num_invalid_ids; i++) {
                 total += invalid_ids[i];
-                printf("Invalid ID: %9llu, TOTAL: %10llu\n", invalid_ids[i], total);
+                //printf("Invalid ID: %9llu, TOTAL: %10llu\n", invalid_ids[i], total);
             }
         }
 
-        printf("\n\n");
+        printf("\n");
     }
 
     printf("Total Invalid: %llu\n\n", total);
