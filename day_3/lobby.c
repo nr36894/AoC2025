@@ -12,7 +12,8 @@ int* pairNumbers(int total) {
 int main() {
     FILE *fp;
     char line[126];
-    int total = 0;
+    uint64_t total = 0;
+    uint64_t ull_highest_num = 0;
 
     fp = fopen("input.txt", "r");
 
@@ -22,36 +23,58 @@ int main() {
     }
 
     while (fgets(line, sizeof(line), fp) != NULL) {
-        int first_val = 0;
-        int first_idx = 0;
-        int second_val = 0;
-        int second_idx = 0;
+        int *int_line = (int*)malloc((strlen(line) - 1) * sizeof(int));
+        int line_length = strlen(line) - 1;
 
-        printf("%s", line);
-
-        for (int i = 0; i < strlen(line) - 2; i++) {
-            int val = line[i] - '0';
-
-            if (val > first_val) {
-                first_val = val;
-                first_idx = i;
-            }
+        for (int i = 0; i < line_length; i++) {
+            int_line[i] = line[i] - '0';
         }
 
-        for (int i = first_idx + 1; i < strlen(line) - 1; i++) {
-            int val = line[i] - '0';
-
-            if (val > second_val) {
-                second_val = val;
-                second_idx = i;
+        for (int i = 0; i < line_length; i++) {
+            if (int_line[i] > 0) {
+                printf("%d", int_line[i]);
             }
         }
+        printf("\n");
 
-        total += first_val * 10 + second_val;
-        printf("Max: %d%d\n", first_val, second_val);
+        char highest_num[13];
+        memset(highest_num, '-', sizeof(highest_num));
+        highest_num[12] = '\0';
+        int highest_num_idx = 0;
+        int remaining_picks = 12;
+        int start = 0;
+        int end = line_length - remaining_picks;
+
+        // Window Loop
+        while (end < line_length - 1) {
+            int max_int = 0;
+            int max_idx = -1;
+            end = line_length - remaining_picks;
+            for (int i = start; i <= end; i++) {
+                if (int_line[i] > max_int) {
+                    max_int = int_line[i];
+                    max_idx = i;
+                    start = i + 1;
+                }
+            }
+
+            highest_num[highest_num_idx] = max_int + '0';
+            highest_num_idx++;
+            remaining_picks--;
+            printf("Highest Num: %s!\n", highest_num);
+        }
+
+        printf("\n");
+        printf("%s\n", highest_num);
+        
+        char *endptr;
+        ull_highest_num = strtoull(highest_num, &endptr, 10);
+        total += ull_highest_num;
+
+        free(int_line);
     }
 
-    printf("%d\n", total);
+    printf("\nTotal: %llu\n", total);
 
     return 1;
 }
