@@ -5,22 +5,50 @@
 
 #define TESTING false
 
-struct Range {
+typedef struct {
     uint64_t start;
     uint64_t end;
-};
+} Range;
+
+void sort_range(Range *ranges, int num_ranges) {
+    for (int i = 0; i < num_ranges - 1; i++) {
+        for (int j = 0; j < num_ranges - i - 1; j++) {
+            if (ranges[j].start > ranges[j + 1].start) {
+                Range tmp = ranges[j];
+                ranges[j] = ranges[j + 1];
+                ranges[j + 1] = tmp;
+            }
+        }
+    }
+}
+
+void merge_range(Range *ranges, int *num_ranges) {
+    if (*num_ranges <= 1) return;
+
+    int write_idx = 0;
+
+    for (int i = 1; i < *num_ranges; i++) {
+        if (ranges[i].start <= ranges[write_idx].end + 1) {
+            if (ranges[i].end > ranges[write_idx].end) {
+                ranges[write_idx].end = ranges[i].end;
+            }
+        } else {
+            write_idx++;
+            ranges[write_idx] = ranges[i];
+        }
+    }
+
+    *num_ranges = write_idx + 1;
+}
 
 int main() {
     FILE *fp;
     char line[33];
-    struct Range *ranges = NULL;
-    uint64_t *ids = NULL;
+    Range *ranges = NULL;
+    Range *merged_ranges = NULL;
     int num_ranges = 0;
     int range_idx = 0;
-    int id_idx = 0;
-    int num_ids = 0;
-    int fresh_ids = 0;
-    bool looking_at_ids = false;
+    uint64_t fresh_ids = 0;
 
     if (TESTING) {
         fp = fopen("test.txt", "r");
@@ -35,79 +63,63 @@ int main() {
 
     while (fgets(line, sizeof(line), fp) != NULL) {
         if (strcmp(line, "\n") == 0) {
-            looking_at_ids = true;
-            continue;
+            break;
         }
 
-        if (!looking_at_ids) {
-            num_ranges++;
-        } else {
-            num_ids++;
-        }
+        num_ranges++;
     }
 
-    ranges = malloc(sizeof(struct Range) * num_ranges);
-    ids = malloc(sizeof(int) * num_ids);
+    ranges = malloc(sizeof(Range) * num_ranges);
 
     rewind(fp);
-    looking_at_ids = false;
 
     while (fgets(line, sizeof(line), fp) != NULL) {
         if (strcmp(line, "\n") == 0) {
-            looking_at_ids = true;
-            continue;
+            break;
         }
 
-        if (!looking_at_ids) {
-            char *token;
-            int token_num = 0;
-            token = strtok(line, "-");
+        char *token;
+        int token_num = 0;
+        token = strtok(line, "-");
 
-            while (token != NULL) {
-                if (token_num == 0) {
-                    char *endptr;
-                    ranges[range_idx].start = strtoull(token, &endptr, 10);
-                } else if (token_num == 1) {
-                    char *endptr;
-                    ranges[range_idx].end = strtoull(token, &endptr, 10);
-                }
-                token_num++;
-                token = strtok(NULL, "-");
+        while (token != NULL) {
+            if (token_num == 0) {
+                char *endptr;
+                ranges[range_idx].start = strtoull(token, &endptr, 10);
+            } else if (token_num == 1) {
+                char *endptr;
+                ranges[range_idx].end = strtoull(token, &endptr, 10);
             }
-            range_idx++;
-        } else {
-            char *endptr;
-            ids[id_idx] =  strtoull(line, &endptr, 10);
-            id_idx++;
+            token_num++;
+            token = strtok(NULL, "-");
         }
+        range_idx++;
     }
+    
+    sort_range(ranges, num_ranges);
+    merge_range(ranges, &num_ranges);
 
-    for (int curr_id_idx = 0; curr_id_idx < num_ids; curr_id_idx++) {
-        uint64_t curr_id = ids[curr_id_idx];
+    printf("Num Ranges: %d\n", num_ranges);
 
-        for (int curr_range_idx = 0; curr_range_idx < num_ranges; curr_range_idx++) {
-            if (curr_id >= ranges[curr_range_idx].start && curr_id <= ranges[curr_range_idx].end) {
-                fresh_ids++;
-                break;
-            }
-        }
-    }
-    printf("Num Ranges: %d, Num IDs: %d\n", num_ranges, num_ids);
 
-    if (TESTING) {
+    int num_valid_ranges = 0;
+    if (true) {
         for (int i = 0; i < num_ranges; i++) {
+            if (ranges[i].start == ranges[i].end && ranges[i].start == UINT64_MAX) {
+                continue;
+            }
             printf("Range: %llu-%llu\n", ranges[i].start, ranges[i].end);
+
+            fresh_ids += ranges[i].end - ranges[i].start + 1;
+            num_valid_ranges++;
         }
         printf("\n");
-        for (int i = 0; i < num_ids; i++) {
-            printf("ID: %llu\n", ids[i]);
-        }
     }
+    printf("Num Valid Ranges: %d\n", num_valid_ranges);
 
-    printf("There are %d fresh IDs.\n", fresh_ids);
+    printf("There are %llu fresh IDs.\n", fresh_ids);
 
     free(ranges);
-    free(ids);
 
     fclose(fp);
 
