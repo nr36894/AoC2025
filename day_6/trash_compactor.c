@@ -20,70 +20,85 @@ int main() {
 
     while (fgets(line, sizeof(line), fp) != NULL) {
         if(line_length == 0) {
-            char *token;
-            token = strtok(line, " ");
-
-            while (token != NULL) {
-                line_length++;
-                token = strtok(NULL, " ");
-            }
+            line_length = strlen(line) - 1;
         }
 
         num_lines++;
     }
 
-    int (*numbers)[num_lines] = malloc(sizeof(int[line_length][num_lines]));
-    char **symbols = malloc(sizeof(char *) * line_length);
+    char (*numbers)[num_lines] = malloc(sizeof(int[line_length][num_lines]));
 
     rewind(fp);
 
     int line_num = 0;
     while (fgets(line, sizeof(line), fp) != NULL) {
-        char *token;
-        int line_idx = 0;
-        token = strtok(line, " ");
-
-        while (token != NULL) {
-            if (line_num == num_lines - 1) {
-                symbols[line_idx] = malloc(sizeof(char) * strlen(token));
-                strcpy(symbols[line_idx], token);
-            } else {
-                numbers[line_idx][line_num] = atoi(token);
-            }
-
-            token = strtok(NULL, " ");
-            line_idx++;
+        for (int i = 0; i < line_length; i++) {
+            numbers[i][line_num] = line[i];
         }
         line_num++;
     }
 
     fclose(fp);
 
-    for (int column = 0; column < line_length; column++) {
-        int64_t problem_total = 0;
-        for (int row = 0; row < num_lines - 1; row++) {
-            printf("%d %s ", numbers[column][row], symbols[column]);
+    int num_idx = 0;
+    int num_list[10];
+    memset(num_list, 0, sizeof(int) * 10);
+    for (int col = line_length - 1; col >= 0; col--) {
+        char *num_str = malloc(sizeof(char) + num_lines);
+        int space_count = 0;
 
-            if (row == 0) {
-                problem_total = numbers[column][row];
-            } else if (strcmp(symbols[column], "*") == 0) {
-                problem_total *= numbers[column][row];
-            } else if (strcmp(symbols[column], "+") == 0) {
-                problem_total += numbers[column][row];
-            } 
+        for (int row = 0; row < num_lines - 1; row++) {
+            num_str[row] = numbers[col][row];
+            if (numbers[col][row] == ' ') {
+                space_count++;
+            }
         }
-        printf("= %llu\n", problem_total);
-        homework_total += problem_total;
+        if (numbers[col][num_lines - 1] == ' ') {
+            space_count++;
+        }
+
+        num_str[num_lines - 1] = '\0';
+
+        if (space_count == num_lines) {
+            free(num_str);
+            continue;
+        }
+
+        num_list[num_idx] = atoi(num_str);
+        num_idx++;
+
+        if (numbers[col][num_lines - 1] == '*') {
+            int64_t problem_total = 0;
+            for (int i = 0; i < num_idx; i++) {
+                if (i == 0) {
+                    problem_total = num_list[i];
+                } else {
+                    problem_total *= num_list[i];
+                }
+            }
+            num_idx = 0;
+            memset(num_list, 0, sizeof(int) * 10);
+            homework_total += problem_total;
+        } else if (numbers[col][num_lines - 1] == '+'){
+            int64_t problem_total = 0;
+            for (int i = 0; i < num_idx; i++) {
+                if (i == 0) {
+                    problem_total = num_list[i];
+                } else {
+                    problem_total += num_list[i];
+                }
+            }
+
+            num_idx = 0;
+            memset(num_list, 0, sizeof(int) * 10);
+            homework_total += problem_total;
+        }
+        free(num_str);
     }
 
     printf("Grand total: %llu\n", homework_total);
 
-    for (int i = 0; i < line_length; i++) {
-        free(symbols[i]);
-    }
-
     free(numbers);
-    free(symbols);
 
     return 0;
 }
