@@ -46,7 +46,7 @@ int main() {
         num_lines++;
     }
 
-    char (*warehouse_map)[num_lines] = malloc(sizeof(int[line_length][num_lines]));
+    char (*warehouse_map)[num_lines] = malloc(sizeof(char[line_length][num_lines]));
     int (*warehouse)[num_lines] = malloc(sizeof(int[line_length][num_lines]));
 
     rewind(fp);
@@ -118,7 +118,9 @@ int main() {
             }
         }
 
-        printf("\nRemove %d rolls of paper.\n", num_accessable);
+        if (TESTING) {
+            printf("\nRemove %d rolls of paper.\n", num_accessable);
+        }
         total_removed += num_accessable;
 
         for (int linenum = 0; linenum < num_lines; linenum++) {
@@ -150,6 +152,9 @@ int main() {
     }
 
     printf("%d rolls of paper can be removed.\n", total_removed);
+
+    free(warehouse);
+    free(warehouse_map);
 
     return 0;
 }
