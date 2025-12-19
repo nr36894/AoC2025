@@ -1,12 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <strings.h>
+#include <stdint.h>
+#include <string.h>
 #include <stdbool.h>
 #include <math.h>
 #include <limits.h>
 #include <float.h>
 
-#define TESTING true
+#define TESTING false
 
 typedef struct {
     int x;
@@ -53,6 +54,13 @@ void _print_distance_table(void *table, int num_lines) {
     }
 }
 
+int _find_root(int idx, const int *parent_idx) {
+    while (parent_idx[idx] != idx) {
+        idx = parent_idx[idx];
+    }
+    return idx;
+}
+
 int main() {
     FILE *fp;
     char line[19];
@@ -79,11 +87,13 @@ int main() {
     rewind(fp);
 
     point_3d *points = malloc(sizeof(point_3d) * num_lines);
-    int *closest_idx = malloc(sizeof(int) * num_lines);
+    int *parent_idx = malloc(sizeof(int) * num_lines);
+    int *circuit_size = malloc(sizeof(int) * num_lines);
     double (*distance_table)[num_lines] = malloc(sizeof(double[num_lines][num_lines]));
 
     for (int i = 0; i < num_lines; i++) {
-        closest_idx[i] = INT_MIN;
+        parent_idx[i] = i;
+        circuit_size[i] = 1;
     }
 
     int point_idx = 0;
@@ -120,11 +130,13 @@ int main() {
 
     printf("\n");
 
-    _print_distance_table(distance_table, num_lines);
+    if (TESTING) {
+        _print_distance_table(distance_table, num_lines);
 
-    printf("\n");
+        printf("\n");
+    }
     
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < num_lines; i++) {
         double shortest_distance = DBL_MAX;
         int shortest_primary = -1;
         int shortest_secondary = -1;
@@ -153,33 +165,81 @@ int main() {
 
         distance_table[shortest_primary][shortest_secondary] *= -1;
 
-        _print_point(&points[shortest_primary]);
-        printf(" -> ");
-        _print_point(&points[shortest_secondary]);
-        printf("\n");
+        if (TESTING) {
+            _print_point(&points[shortest_primary]);
+            printf(" -> ");
+            _print_point(&points[shortest_secondary]);
+            printf("\n");
 
-        printf("Shortest Distance: p1: %d, p2: %d, d: %f\n", shortest_primary, shortest_secondary, shortest_distance);
-    }
+            printf("Shortest Distance: p1: %d, p2: %d, d: %f\n", shortest_primary, shortest_secondary, shortest_distance);
+        }
 
-    printf("\n");
+        int root1 = _find_root(shortest_primary, parent_idx);
+        int root2 = _find_root(shortest_secondary, parent_idx);
 
-    _print_distance_table(distance_table, num_lines);
-
-    printf("\n");
-
-    for(int i = 0; i < num_lines; i++) {
-        int prev_idx = -1;
-
-        if (closest_idx[i] == INT_MIN) {
-            printf("- ");
-        } else {
-            printf("%d ", closest_idx[i]);
+        if (root1 != root2) {
+            circuit_size[root2] += circuit_size[root1];
+            parent_idx[root1] = root2;
         }
     }
+
     printf("\n");
 
+    if (TESTING) {
+        _print_distance_table(distance_table, num_lines);
+
+        printf("\n");
+
+        for(int i = 0; i < num_lines; i++) {
+            printf("%2d ", i);
+        }
+        printf("\n");
+
+        for(int i = 0; i < num_lines; i++) {
+            if (parent_idx[i] == i) {
+                printf(" * ");
+            } else {
+                printf("%2d ", parent_idx[i]);
+            }
+        }
+        printf("\n");
+
+        for(int i = 0; i < num_lines; i++) {
+            printf("%2d ", circuit_size[i]);
+        }
+        printf("\n");
+    }
+
+    printf("\nLargest Circuits: ");
+    
+    int answer = 1;
+    for (int num_circuits = 0; num_circuits < 3; num_circuits++) {
+        int largest_circuit = 0;
+        int largest_circuit_idx = 0;
+
+        for (int i = 0; i < num_lines; i++) {
+            if (parent_idx[i] != i) {
+                continue;
+            }
+
+            if (circuit_size[i] > largest_circuit) {
+                largest_circuit = circuit_size[i];
+                largest_circuit_idx = i;
+            }
+        }
+
+        printf("idx: %d, size: %d ", largest_circuit_idx, largest_circuit);
+        circuit_size[largest_circuit_idx] *= -1;
+        answer *= largest_circuit;
+    }
+
+    printf("\n");
+    printf("Answer: %d\n", answer);
+
+    free(distance_table);
     free(points);
-    free(closest_idx);
+    free(parent_idx);
+    free(circuit_size);
 
     return 0;
 }
