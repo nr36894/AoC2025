@@ -183,7 +183,68 @@ int main() {
         }
     }
 
-    printf("\n");
+    if (TESTING) {
+        printf("\n");
+    }
+
+    double final_connection_length = 0;
+    int final_p1_idx = 0;
+    int final_p2_idx = 0;
+
+    for (int i = 0; i < num_lines; i++) {
+        double shortest_length = DBL_MAX;
+        int shortest_p1_idx = 0;
+        int shortest_p2_idx = 0;
+        
+        if (parent_idx[i] == i) {
+            for (int primary = 0; primary < i; primary++) {
+                if (distance_table[primary][i] < shortest_length && distance_table[primary][i] > 0) {
+                    shortest_length = distance_table[primary][i];
+                    shortest_p1_idx = primary;
+                    shortest_p2_idx = i;
+                }
+            }
+            for (int secondary = i + 1; secondary < num_lines; secondary++) {
+                if (distance_table[i][secondary] < shortest_length && distance_table[i][secondary] > 0) {
+                    shortest_length = distance_table[i][secondary];
+                    shortest_p1_idx = i;
+                    shortest_p2_idx = secondary;
+                }
+            }
+
+            int root_idx = 0;
+            if (shortest_p1_idx == i) {
+                root_idx = _find_root(shortest_p2_idx, parent_idx);
+            } else {
+                root_idx = _find_root(shortest_p1_idx, parent_idx);
+            }
+
+            if (TESTING) {
+                printf("%d Shortest Dis: %f, %d -> %d\n", i, shortest_length, shortest_p1_idx, shortest_p2_idx);
+            }
+
+            if (root_idx == i) {
+                printf("Rejected %d for loop\n", i);
+                if (final_connection_length < shortest_length) {
+                    printf("This would have updated final\n");
+                }
+                continue;
+            }
+
+            if (final_connection_length < shortest_length) {
+                final_connection_length = shortest_length;
+                final_p1_idx = shortest_p1_idx;
+                final_p2_idx = shortest_p2_idx;
+                printf("Updated Dis: %f, %d -> %d\n", final_connection_length, final_p1_idx, final_p2_idx);
+            }
+        }
+    }
+
+    if (!TESTING) {
+        printf("Final Dis: %f, %d -> %d\n", final_connection_length, final_p1_idx, final_p2_idx);
+
+        printf("\n");
+    }
 
     if (TESTING) {
         _print_distance_table(distance_table, num_lines);
@@ -209,32 +270,13 @@ int main() {
         }
         printf("\n");
     }
-
-    printf("\nLargest Circuits: ");
     
-    int answer = 1;
-    for (int num_circuits = 0; num_circuits < 3; num_circuits++) {
-        int largest_circuit = 0;
-        int largest_circuit_idx = 0;
-
-        for (int i = 0; i < num_lines; i++) {
-            if (parent_idx[i] != i) {
-                continue;
-            }
-
-            if (circuit_size[i] > largest_circuit) {
-                largest_circuit = circuit_size[i];
-                largest_circuit_idx = i;
-            }
-        }
-
-        printf("idx: %d, size: %d ", largest_circuit_idx, largest_circuit);
-        circuit_size[largest_circuit_idx] *= -1;
-        answer *= largest_circuit;
-    }
-
+    uint64_t answer = points[final_p1_idx].x * points[final_p2_idx].x;
+    _print_point(&points[final_p1_idx]);
+    printf(" -> ");
+    _print_point(&points[final_p2_idx]);
     printf("\n");
-    printf("Answer: %d\n", answer);
+    printf("Answer: %llu\n", answer);
 
     free(distance_table);
     free(points);
