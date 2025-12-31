@@ -271,12 +271,12 @@ int main() {
         printf("\n");
     }
     
-    uint64_t answer = points[final_p1_idx].x * points[final_p2_idx].x;
+    uint64_t answer = (uint64_t)points[final_p1_idx].x * (uint64_t)points[final_p2_idx].x;
     _print_point(&points[final_p1_idx]);
     printf(" -> ");
     _print_point(&points[final_p2_idx]);
     printf("\n");
-    printf("Answer: %llu\n", answer);
+    printf("Answer: %lu\n", answer);
 
     free(distance_table);
     free(points);
