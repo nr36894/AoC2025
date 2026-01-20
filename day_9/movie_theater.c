@@ -17,67 +17,39 @@ uint64_t _point_area(point *p1, point *p2) {
     return (uint64_t)(abs(p2->x - p1->x) + 1) * (uint64_t)(abs(p2->y - p1->y) + 1);
 }
 
-bool _point_on_segment(point *p, point *p1, point *p2) {
-    // Check if p is on the line segment from p1 to p2
-    int min_x = MIN(p1->x, p2->x);
-    int max_x = MAX(p1->x, p2->x);
-    int min_y = MIN(p1->y, p2->y);
-    int max_y = MAX(p1->y, p2->y);
-    
-    // Point must be within bounding box
-    if (p->x < min_x || p->x > max_x || p->y < min_y || p->y > max_y) {
+bool _segment_intersects_rectangle(point *rect1, point *rect2, point *poly1, point *poly2) {
+    bool poly_vertical;
+    bool rect_vertical;
+
+    int rect_min_x = MIN(rect1->x, rect2->x);
+    int rect_max_x = MAX(rect1->x, rect2->x);
+    int rect_min_y = MIN(rect1->y, rect2->y);
+    int rect_max_y = MAX(rect1->y, rect2->y);
+
+    if (rect_min_x == rect_max_x) {
+        rect_vertical = true;
+    }
+
+    int poly_min_x = MIN(poly1->x, poly2->x);
+    int poly_max_x = MAX(poly1->x, poly2->x);
+    int poly_min_y = MIN(poly1->y, poly2->y);
+    int poly_max_y = MAX(poly1->y, poly2->y);
+
+    if (poly_min_x == poly_max_x) {
+        poly_vertical = true;
+    }
+
+    if (poly_vertical && rect_vertical) {
         return false;
     }
-    
-    // Check if point is collinear with the segment
-    // For horizontal or vertical segments (which your problem has):
-    if (p1->x == p2->x) {  // Vertical segment
-        return p->x == p1->x;
-    }
-    if (p1->y == p2->y) {  // Horizontal segment
-        return p->y == p1->y;
-    }
-    
-    // For diagonal segments, check cross product = 0
-    return (p->y - p1->y) * (p2->x - p1->x) == (p2->y - p1->y) * (p->x - p1->x);
-}
 
-bool _point_in_polygon(point *p, point *points, int num_points) {
-    int x = p->x;
-    int y = p->y;
-    bool inside = false;
-    
-    int j = num_points - 1;  // Start with last vertex
-    for (int i = 0; i < num_points; i++) {
-        // Check if point is ON this edge
-        if (_point_on_segment(p, &points[j], &points[i])) {
-            if (TESTING) {
-                printf("\t(%d, %d) Is on edge (%d, %d) -> (%d, %d)\n", 
-                    x, y, points[j].x, points[j].y, points[i].x, points[i].y);
-            }
-            return true;
-        }
-
-        int xi = points[i].x;
-        int yi = points[i].y;
-        int xj = points[j].x;
-        int yj = points[j].y;
-        
-        // Check if ray from point crosses this edge
-        if ((yi > y) != (yj > y) && 
-            (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) {
-            inside = !inside;
-            
-            if (TESTING) {
-                printf("\t(%d, %d) Crosses line (%d, %d) -> (%d, %d)\n", x, y, points[j].x, points[j].y, points[i].x, points[i].y);
-            }
-        }
-        
-
-        j = i;
+    // This is the only case I care about, so this is the only one I'm implementing
+    if (rect_vertical) {
+        // The version of x does not matter, since they must be the same
+        return (poly_min_x < rect_min_x && rect_max_x < poly_max_x && rect_min_y < poly_min_y && rect_max_y > poly_max_y);
     }
-    
-    return inside;
+
+    return false;
 }
 
 bool _point_inside_rectangle(point *p1, point *p2, point *inside) {
@@ -90,6 +62,18 @@ bool _point_inside_rectangle(point *p1, point *p2, point *inside) {
 }
 
 bool _valid_square(point *p1, point *p2, point *points, int num_points) {
+    int min_x = MIN(p1->x, p2->x);
+    int min_y = MIN(p1->y, p2->y);
+    int max_x = MAX(p1->x, p2->x);
+    int max_y = MAX(p1->y, p2->y);
+
+    point corners[4] = {
+        {min_x, min_y},
+        {min_x, max_y},
+        {max_x, min_y},
+        {max_x, max_y}
+    };
+
     for (int i = 0; i < num_points; i++) {
         if (&points[i] == p1 || &points[i] == p2) {
             continue;
@@ -102,26 +86,13 @@ bool _valid_square(point *p1, point *p2, point *points, int num_points) {
             return false;
         }
 
-        int min_x = MIN(p1->x, p2->x);
-        int min_y = MIN(p1->y, p2->y);
-        int max_x = MAX(p1->x, p2->x);
-        int max_y = MAX(p1->y, p2->y);
-
-        point corners[4] = {
-            {min_x, min_y},
-            {min_x, max_y},
-            {max_x, min_y},
-            {max_x, max_y}
-        };
-
-        for (int i = 0; i < 4; i++) {
-            if ((corners[i].x == p1->x && corners[i].y == p1->y) ||
-                (corners[i].x == p2->x && corners[i].y == p2->y)) {
-                continue;
-            }
-            if (!_point_in_polygon(&corners[i], points, num_points)) {
+        if (i + 1 == num_points) {
+            if (_segment_intersects_rectangle(&corners[0], &corners[1], &points[i], &points[0])) {
                 return false;
             }
+        }
+        if (_segment_intersects_rectangle(&corners[0], &corners[1], &points[i], &points[i+1])) {
+            return false;
         }
     }
 
@@ -175,19 +146,21 @@ int main() {
     for (int i = 0; i < num_points - 1; i++) {
         for (int j = i + 1; j < num_points; j++) {
             uint64_t area = _point_area(&points[i], &points[j]);
-            bool is_valid = _valid_square(&points[i], &points[j], points, num_points);
 
-            if (area > biggest_area && is_valid) {
-                biggest_area = area;
-                big_p1 = &points[i];
-                big_p2 = &points[j];
-                if (TESTING) {
-                    printf("*");
+            if (area > biggest_area) {
+                bool is_valid = _valid_square(&points[i], &points[j], points, num_points);
+                if (is_valid) {
+                    biggest_area = area;
+                    big_p1 = &points[i];
+                    big_p2 = &points[j];
+                    if (TESTING) {
+                        printf("*");
+                    }
                 }
-            }
 
-            if (TESTING) {
-                printf("Is Valid: %s (%d, %d) -> (%d, %d) Area: %llu\n", is_valid ? "true" : "false", points[i].x, points[i].y, points[j].x, points[j].y, area);
+                if (TESTING) {
+                    printf("Is Valid: %s (%d, %d) -> (%d, %d) Area: %llu\n", is_valid ? "true" : "false", points[i].x, points[i].y, points[j].x, points[j].y, area);
+                }
             }
         }
     }
@@ -196,6 +169,7 @@ int main() {
         printf("\n");
     }
     printf("Biggest Area: %llu\n", biggest_area);
+    printf("(%d, %d) -> (%d, %d)\n", big_p1->x, big_p1->y, big_p2->x, big_p2->y);
 
     free(points);
 }
