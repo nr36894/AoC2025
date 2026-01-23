@@ -5,11 +5,12 @@
 #include <limits.h>
 #include <math.h>
 
-#define TESTING true
+#define TESTING false
 
 typedef struct {
     int num_lights;
     int num_buttons;
+    int num_joltages;
     bool lights [10];
     bool buttons [12][10];
     int voltages [10];
@@ -26,11 +27,14 @@ void _replace_char(char *s, char c1, char c2) {
 }
 
 void _parse_line(char *s, machine *curr_machine) {
-    bool in_lights;
-    bool in_buttons;
-    bool in_voltages;
+    bool in_lights = false;
+    bool in_buttons = false;
+    bool in_voltages = false;
     int index = 0;
     int button_index = 0;
+    int voltage_index = 0;
+    char voltage_str[4] = {'\0'};
+    int voltage_str_idx = 0;
     int strLen = strlen(s);
 
     for (int i = 0; i < strLen; i++) {
@@ -56,6 +60,13 @@ void _parse_line(char *s, machine *curr_machine) {
                 index = 0;
                 break;
             case '}':
+                curr_machine->voltages[voltage_index] = atoi(voltage_str);
+                for (int c = 0; c < 4; c++) {
+                    voltage_str[c] = '\0';
+                }
+                voltage_str_idx = 0;
+                voltage_index++;
+                curr_machine->num_joltages = voltage_index;
                 in_voltages = false;
                 break;
             default:
@@ -67,6 +78,17 @@ void _parse_line(char *s, machine *curr_machine) {
                     curr_machine->lights[index] = true;
                     index++;
                     curr_machine->num_lights = index;
+                } else if (in_voltages && s[i] == ',') {
+                    curr_machine->voltages[voltage_index] = atoi(voltage_str);
+                    for (int c = 0; c < 4; c++) {
+                        voltage_str[c] = '\0';
+                    }
+                    voltage_str_idx = 0;
+                    voltage_index++;
+                    curr_machine->num_joltages = voltage_index;
+                } else if (in_voltages && s[i] != ',') {
+                    voltage_str[voltage_str_idx] = s[i];
+                    voltage_str_idx++;
                 } else if (in_buttons) {
                     switch (s[i]) {
                         case ',':
@@ -83,42 +105,49 @@ void _parse_line(char *s, machine *curr_machine) {
 }
 
 int _solve_matrix(machine *curr_machine, void *v_matrix) {
-    int button_state [curr_machine->num_buttons];
-    bool (*matrix)[curr_machine->num_buttons + 1] = v_matrix;
+    int (*matrix)[curr_machine->num_buttons + 1] = v_matrix;
     bool is_free[curr_machine->num_buttons];
     int free_idx[curr_machine->num_buttons];
-    bool rhs[curr_machine->num_lights];
-    int num_free = 0;
+    int free_max[curr_machine->num_buttons];
+    int rhs[curr_machine->num_joltages];
+    int num_free = curr_machine->num_buttons;
     int min_presses = INT_MAX;
 
-    memset(is_free, false, sizeof(is_free));
+    memset(is_free, true, sizeof(is_free));
     memset(rhs, false, sizeof(rhs));
     memset(free_idx, 0, sizeof(free_idx));
 
-    for (int i = 0; i < curr_machine->num_lights; i++) {
+    for (int i = 0; i < curr_machine->num_joltages; i++) {
         rhs[i] = matrix[i][curr_machine->num_buttons];
     }
 
-    for (int col = 0; col < curr_machine->num_buttons; col++) {
-        bool has_pivot = false;
-        for (int row = 0; row < curr_machine->num_lights; row++) {
-            if (matrix[row][col] == 1 && row == col) {
-                has_pivot = true;
+    for (int i = 0; i < curr_machine->num_buttons; i++) {
+        free_max[i] = -1;
+    }
+
+    for (int row = 0; row < curr_machine->num_joltages; row++) {
+        for (int col = 0; col < curr_machine->num_buttons; col++) {
+            
+            if (matrix[row][col] != 0) {
+                is_free[col] = false;
+                num_free--;
                 break;
             }
         }
+    }
 
-        if (!has_pivot) {
-            is_free[col] = true;
-            free_idx[num_free] = col;
-            num_free++;
+    int idx = 0;
+    for (int col = 0; col < curr_machine->num_buttons; col++) {
+        if (is_free[col]) {
+            free_idx[idx++] = col;
         }
     }
 
+
     // Verify state of math variables
-    if (TESTING) {
-        printf("RHS: [ ");
-        for (int i = 0; i < curr_machine->num_lights; i++) {
+    if (TESTING || !TESTING) {
+        printf("\nRHS: [ ");
+        for (int i = 0; i < curr_machine->num_joltages; i++) {
             printf("%d ", rhs[i]);
         }
         printf("]\n");
@@ -130,106 +159,89 @@ int _solve_matrix(machine *curr_machine, void *v_matrix) {
             printf("%s ", (is_free[i]) ? "t" : "f");
         }
         printf("]\n");
+        printf("Free Cols: [ ");
+        for (int i = 0; i < curr_machine->num_buttons; i++) {
+            printf("%d ", free_idx[i]);
+        }
+        printf("]\n\n");
     }
 
-    int max_free = pow(2, num_free);
-
-    
-    for (int i = 0; i < max_free; i++) {
-        bool solution[curr_machine->num_buttons];
-        memset(solution, false, sizeof(solution));
-
-        for (int idx = 0; idx < num_free; idx++) {
-            solution[free_idx[idx]] = (i >> idx) & 1;
-        }
-
-        for (int row = 0; row < curr_machine->num_lights; row++) {
-            if (matrix[row][row] == 1) {
-                bool val = matrix[row][curr_machine->num_buttons];
-                for (int col = 0; col < curr_machine->num_buttons; col++) {
-                    if (col != row && matrix[row][col] == 1) {
-                        val ^= solution[col];
-                    }
-                }
-                solution[row] = val;
-            }
-        }
-
-        bool valid_solution = true;
-        for (int light = 0; light < curr_machine->num_lights; light++){
-            bool light_state = false;
-            for (int button = 0; button < curr_machine->num_buttons; button++) {
-                if (matrix[light][button] == 1) {
-                    light_state ^= solution[button];
+    for (int row = 0; row < curr_machine->num_joltages; row++) {
+        for (int col = 0; col < curr_machine->num_buttons; col++) {
+            if (matrix[row][col] != 0 && is_free[col]) {
+                if (matrix[row][col] > 0 && rhs[row] > free_max[col]) {
+                    free_max[col] = rhs[row];
                 }
             }
-
-            if (light_state != rhs[light]) {
-                if (TESTING || !TESTING) {
-                    printf("INVALID ");
-                }
-                valid_solution = false;
-                break;
-            }
         }
+    }
 
-        if (TESTING || !TESTING) {
-            printf("Solution: ");
-            for (int button = 0; button < curr_machine->num_buttons; button++) {
-                printf("%d ", solution[button]);
+    if (TESTING || !TESTING) {
+        printf("Free Max: [ ");
+        for (int i = 0; i < curr_machine->num_buttons; i++) {
+            printf("%d ", free_max[i]);
+        }
+        printf("]\n\n");
+        for (int i = 0; i < curr_machine->num_buttons; i++) {
+            if (!is_free[i]) {
+                continue;
+            }
+            printf("  ");
+            printf("b%-2d", i);
+            if (free_max[i] != INT_MAX) {
+                printf(" ≤ %-3d", free_max[i]);
             }
             printf("\n");
-        }
 
-        if (valid_solution) {
-            int num_presses = 0;
-            for (int j = 0; j < curr_machine->num_buttons; j++) {
-                if (solution[j]) {
-                    num_presses++;
-                }
-            }
-
-            if (num_presses < min_presses && num_presses > 0) {
-                min_presses = num_presses;
-            }
         }
+        printf("\n");
     }
+
+    // for (int i = 0)
 
     return min_presses;
 }
 
-int _time_to_gaussian(machine *curr_machine) {
-    bool (*matrix)[curr_machine->num_buttons + 1] = malloc(curr_machine->num_lights * sizeof(*matrix));
+int _create_echelon_matrix(machine *curr_machine) {
+    int (*matrix)[curr_machine->num_buttons + 1] = malloc(curr_machine->num_joltages * sizeof(*matrix));
     memset(matrix, false, sizeof(*matrix));
 
-    for (int i = 0; i < curr_machine->num_lights; i++) {
+    for (int i = 0; i < curr_machine->num_joltages; i++) {
         for (int j = 0; j < curr_machine->num_buttons + 1; j++) {
             matrix[i][j] = curr_machine->buttons[j][i];
         }
-            matrix[i][curr_machine->num_buttons] = curr_machine->lights[i];
+            matrix[i][curr_machine->num_buttons] = curr_machine->voltages[i];
     }
 
-    if (TESTING) {
+    if (TESTING || !TESTING) {
         printf("Starting Matrix:\n");
-        for (int i = 0; i < curr_machine->num_lights; i++) {
+        for (int i = 0; i < curr_machine->num_joltages; i++) {
             printf("| ");
             for (int j = 0; j < curr_machine->num_buttons + 1; j++) {
                 if (j == curr_machine->num_buttons) {
-                    printf("| %d ", matrix[i][j]);
+                    printf("| %3d ", matrix[i][j]);
                 } else {
-                    printf("%d ", matrix[i][j]);
+                    printf("%2d ", matrix[i][j]);
                 }
             }
             printf("|\n");
         }
     }
 
+
+    // Reduce the matrix
     for (int col = 0; col < curr_machine->num_buttons + 1; col++) {
         int pivot_row = -1;
         int curr_row = col;
-        for (int r = curr_row; r < curr_machine->num_lights; r++) {
+        for (int r = curr_row; r < curr_machine->num_joltages; r++) {
             if (matrix[r][col] == 1) {
                 pivot_row = r;
+                break;
+            } else if (matrix[r][col] == -1) {
+                pivot_row = r;
+                for (int i = 0; i < curr_machine->num_buttons + 1; i++) {
+                    matrix[r][i] *= -1;
+                }
                 break;
             }
         }
@@ -245,22 +257,25 @@ int _time_to_gaussian(machine *curr_machine) {
             pivot_row = curr_row;
         }
 
-        for (int row = 0; row < curr_machine->num_lights; row++) {
-            if (row != pivot_row && matrix[row][col] == 1) {
+        for (int row = 0; row < curr_machine->num_joltages; row++) {
+            if (row != pivot_row && matrix[row][col] != 0) {
+                int row_coef = matrix[row][col];
+                int pivot_coef = matrix[pivot_row][col];
+
                 for (int c = 0; c < curr_machine->num_buttons + 1; c++) {
-                    matrix[row][c] = matrix[row][c] ^ matrix[pivot_row][c];
+                    matrix[row][c] = matrix[row][c] * pivot_coef - matrix[pivot_row][c] * row_coef;
                 }
             }
         }
         if (TESTING) {
         printf("\nCurrent Matrix:\n");
-            for (int i = 0; i < curr_machine->num_lights; i++) {
+            for (int i = 0; i < curr_machine->num_joltages; i++) {
                 printf("| ");
                 for (int j = 0; j < curr_machine->num_buttons + 1; j++) {
                     if (j == curr_machine->num_buttons) {
-                        printf("| %d ", matrix[i][j]);
+                        printf("| %3d ", matrix[i][j]);
                     } else {
-                        printf("%d ", matrix[i][j]);
+                        printf("%2d ", matrix[i][j]);
                     }
                 }
                 printf("|\n");
@@ -270,13 +285,13 @@ int _time_to_gaussian(machine *curr_machine) {
 
     if (TESTING || !TESTING) {
         printf("\nEnding Matrix:\n");
-        for (int i = 0; i < curr_machine->num_lights; i++) {
+        for (int i = 0; i < curr_machine->num_joltages; i++) {
             printf("| ");
             for (int j = 0; j < curr_machine->num_buttons + 1; j++) {
                 if (j == curr_machine->num_buttons) {
-                    printf("| %d ", matrix[i][j]);
+                    printf("| %3d ", matrix[i][j]);
                 } else {
-                    printf("%d ", matrix[i][j]);
+                    printf("%2d ", matrix[i][j]);
                 }
             }
             printf("|\n");
@@ -329,21 +344,27 @@ int main() {
     for (int i = 0; i < num_lines; i++) {
         printf("Light Pattern:    ");
         for (int j = 0; j < machines[i].num_lights; j++) {
-            printf("%d ", machines[i].lights[j]);
+            printf("%2d ", machines[i].lights[j]);
+        }
+        printf("\n");
+        printf("Joltages:         ");
+        for (int j = 0; j < machines[i].num_joltages; j++) {
+            printf("%2d ", machines[i].voltages[j]);
         }
         printf("\n");
         for (int j = 0; j < machines[i].num_buttons; j++) {
             printf("       Button %2d: ", j);
             for (int k = 0; k < machines[i].num_lights; k++) {
-                printf("%d ", machines[i].buttons[j][k]);
+                printf("%2d ", machines[i].buttons[j][k]);
             }
             printf("\n");
         }
         printf("\n");
+        printf("\n");
 
-        int answer = _time_to_gaussian(&machines[i]);
+        int answer = _create_echelon_matrix(&machines[i]);
         total_answer += answer;
-        printf("Answer: %d", answer);
+        printf("Answer: %d\n", answer);
         printf("\n");
     }
 
